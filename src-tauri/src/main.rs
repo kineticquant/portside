@@ -2,6 +2,7 @@
 
 mod catalog;
 mod docker;
+mod schemas;
 mod state;
 
 #[tauri::command]
@@ -20,7 +21,12 @@ fn main() {
             docker::remove_instance,
             docker::list_instances,
             catalog::get_catalog,
-            catalog::suggest_port
+            catalog::suggest_port,
+            schemas::list_databases,
+            schemas::create_database,
+            schemas::drop_database,
+            schemas::list_schemas,
+            schemas::redis_info,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run portside");
