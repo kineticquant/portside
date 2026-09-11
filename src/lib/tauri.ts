@@ -21,6 +21,12 @@ export type Catalog = {
   entries: CatalogEntry[];
 };
 
+export type Health = {
+  container_running: boolean;
+  tcp_open: boolean;
+  query_ok: boolean;
+};
+
 export function connectString(i: Pick<Instance, "engine" | "port">): string {
   if (i.engine === "postgres") {
     return `postgres://postgres:portside@127.0.0.1:${i.port}/postgres`;
@@ -51,5 +57,8 @@ export const api = {
   schemas: (id: string, db: string) =>
     invoke<string[]>("list_schemas", { id, db }),
   redisInfo: (id: string) => invoke<string>("redis_info", { id }),
+  logs: (id: string, tail = 200) =>
+    invoke<string>("container_logs", { id, tail }),
+  health: (id: string) => invoke<Health>("health", { id }),
   connectString,
 };

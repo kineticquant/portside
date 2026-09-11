@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import InstanceList from "./components/InstanceList";
+import LogsPanel from "./components/LogsPanel";
 import SchemaPanel from "./components/SchemaPanel";
-import { api, type CatalogEntry, type Instance } from "./lib/tauri";
+import { api, type CatalogEntry, type Health, type Instance } from "./lib/tauri";
 
 const ENGINES = ["mysql", "mariadb", "postgres", "redis", "valkey"];
 
@@ -19,6 +20,7 @@ export default function App() {
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [health, setHealth] = useState<Health | null>(null);
   const [engine, setEngine] = useState("postgres");
   const [tag, setTag] = useState("");
   const [port, setPort] = useState("");
@@ -118,6 +120,28 @@ export default function App() {
 
   const selected = instances.find((i) => i.id === selectedId) ?? null;
 
+  useEffect(() => {
+    if (!selected) {
+      setHealth(null);
+      return;
+    }
+    let cancelled = false;
+    const fetchHealth = async () => {
+      try {
+        const h = await api.health(selected.id);
+        if (!cancelled) setHealth(h);
+      } catch {
+        if (!cancelled) setHealth(null);
+      }
+    };
+    void fetchHealth();
+    const timer = setInterval(() => void fetchHealth(), 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [selected?.id]);
+
   return (
     <div>
       <h1>Portside</h1>
@@ -191,6 +215,24 @@ export default function App() {
       </section>
       <section>
         <SchemaPanel instanceId={selected?.id ?? null} engine={selected?.engine} />
+      </section>
+      <section>
+        {selected && health ? (
+          <p>
+            Health:{" "}
+            {health.container_running && health.tcp_open && health.query_ok
+              ? "healthy"
+              : "degraded"}
+            {" (container: "}
+            {health.container_running ? "running" : "not running"}
+            {", tcp: "}
+            {health.tcp_open ? "open" : "closed"}
+            {", query: "}
+            {health.query_ok ? "ok" : "failing"}
+            {")"}
+          </p>
+        ) : null}
+        <LogsPanel instanceId={selected?.id ?? null} />
       </section>
     </div>
   );

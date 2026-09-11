@@ -2,6 +2,7 @@
 
 mod catalog;
 mod docker;
+mod health;
 mod schemas;
 mod state;
 
@@ -27,6 +28,8 @@ fn main() {
             schemas::drop_database,
             schemas::list_schemas,
             schemas::redis_info,
+            health::container_logs,
+            health::health,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run portside");
