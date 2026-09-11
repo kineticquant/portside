@@ -1,0 +1,16 @@
+{
+  "updated": "2026-09-11",
+  "entries": [
+    { "engine": "mysql", "tag": "8.4", "image": "mysql:8.4" },
+    { "engine": "mysql", "tag": "9.7", "image": "mysql:9.7" },
+    { "engine": "mysql", "tag": "26.7", "image": "mysql:26.7" },
+    { "engine": "mariadb", "tag": "11.4", "image": "mariadb:11.4" },
+    { "engine": "mariadb", "tag": "11.8", "image": "mariadb:11.8" },
+    { "engine": "mariadb", "tag": "12.3", "image": "mariadb:12.3" },
+    { "engine": "postgres", "tag": "16", "image": "postgres:16" },
+    { "engine": "postgres", "tag": "17", "image": "postgres:17" },
+    { "engine": "redis", "tag": "7", "image": "redis:7" },
+    { "engine": "redis", "tag": "8", "image": "redis:8" },
+    { "engine": "valkey", "tag": "8", "image": "valkey/valkey:8" }
+  ]
+}

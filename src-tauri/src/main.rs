@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod catalog;
 mod docker;
 mod state;
 
@@ -17,7 +18,9 @@ fn main() {
             docker::start_instance,
             docker::stop_instance,
             docker::remove_instance,
-            docker::list_instances
+            docker::list_instances,
+            catalog::get_catalog,
+            catalog::suggest_port
         ])
         .run(tauri::generate_context!())
         .expect("failed to run portside");
