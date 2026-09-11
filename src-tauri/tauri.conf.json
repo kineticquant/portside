@@ -3,7 +3,7 @@
   "productName": "Portside",
   "version": "0.1.0",
   "identifier": "app.portside.dev",
-  "build": { "frontendDist": "../dist", "devUrl": "http://localhost:1420" },
+  "build": { "frontendDist": "../dist", "devUrl": "http://localhost:1420", "beforeDevCommand": "npm run dev", "beforeBuildCommand": "npm run build" },
   "app": { "windows": [{ "title": "Portside", "width": 1100, "height": 700 }] },
   "bundle": { "active": true, "targets": "all" }
 }

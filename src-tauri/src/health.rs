@@ -94,11 +94,14 @@ pub async fn health(id: String) -> Result<Health, String> {
     .await
     .is_ok_and(|r| r.is_ok());
     let query_ok = check_query(&inst).await;
-    Ok(Health {
+    let h = Health {
         container_running,
         tcp_open,
         query_ok,
-    })
+    };
+    // Canonical healthy/degraded conjunction (single source; also covered by tests).
+    let _ = h.is_healthy();
+    Ok(h)
 }
 
 #[cfg(test)]
