@@ -9,6 +9,7 @@ export type InstanceListProps = {
   onSelect?: (id: string) => void;
   selectedId?: string | null;
   actionError?: string | null;
+  onActionError?: (message: string) => void;
 };
 
 async function copyText(text: string): Promise<void> {
@@ -32,6 +33,7 @@ export default function InstanceList({
   onSelect,
   selectedId,
   actionError,
+  onActionError,
 }: InstanceListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -40,9 +42,15 @@ export default function InstanceList({
   }
 
   const handleCopy = async (inst: Instance) => {
-    await copyText(api.connectString(inst));
-    setCopiedId(inst.id);
-    setTimeout(() => setCopiedId((cur) => (cur === inst.id ? null : cur)), 1500);
+    try {
+      await copyText(api.connectString(inst));
+      setCopiedId(inst.id);
+      setTimeout(() => setCopiedId((cur) => (cur === inst.id ? null : cur)), 1500);
+    } catch (e) {
+      onActionError?.(
+        `Copy failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   };
 
   return (

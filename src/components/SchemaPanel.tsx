@@ -11,12 +11,16 @@ export default function SchemaPanel({ instanceId, engine }: SchemaPanelProps) {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [selectedDb, setSelectedDb] = useState<string | null>(null);
+  const [schemas, setSchemas] = useState<string[]>([]);
 
   useEffect(() => {
     if (!instanceId) return;
     let cancelled = false;
     setError(null);
     setInfo(null);
+    setSelectedDb(null);
+    setSchemas([]);
     if (engine === "redis" || engine === "valkey") {
       api
         .redisInfo(instanceId)
@@ -43,6 +47,22 @@ export default function SchemaPanel({ instanceId, engine }: SchemaPanelProps) {
       cancelled = true;
     };
   }, [instanceId, engine]);
+
+  useEffect(() => {
+    if (!instanceId || engine !== "postgres" || !selectedDb) return;
+    let cancelled = false;
+    api
+      .schemas(instanceId, selectedDb)
+      .then((s) => {
+        if (!cancelled) setSchemas(s);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [instanceId, engine, selectedDb]);
 
   if (!instanceId) {
     return <p>Select an instance to manage schemas.</p>;
@@ -82,6 +102,10 @@ export default function SchemaPanel({ instanceId, engine }: SchemaPanelProps) {
   const handleDrop = async (db: string) => {
     try {
       await api.dropDb(instanceId, db);
+      if (db === selectedDb) {
+        setSelectedDb(null);
+        setSchemas([]);
+      }
       await refresh();
     } catch (e) {
       setError(String(e));
@@ -99,6 +123,17 @@ export default function SchemaPanel({ instanceId, engine }: SchemaPanelProps) {
           {databases.map((db) => (
             <li key={db}>
               {db}{" "}
+              {engine === "postgres" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDb(db);
+                    setSchemas([]);
+                  }}
+                >
+                  View schemas
+                </button>
+              ) : null}{" "}
               <button type="button" onClick={() => void handleDrop(db)}>
                 Drop
               </button>
@@ -106,6 +141,21 @@ export default function SchemaPanel({ instanceId, engine }: SchemaPanelProps) {
           ))}
         </ul>
       )}
+      {engine === "postgres" && selectedDb ? (
+        <div>
+          <h3>Schemas in {selectedDb}</h3>
+          <p>Schema list is read-only.</p>
+          {schemas.length === 0 ? (
+            <p>No schemas found.</p>
+          ) : (
+            <ul>
+              {schemas.map((s) => (
+                <li key={s}>{s}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
       <div>
         <input
           aria-label="database name"

@@ -5,6 +5,14 @@ import { api, type CatalogEntry, type Instance } from "./lib/tauri";
 
 const ENGINES = ["mysql", "mariadb", "postgres", "redis", "valkey"];
 
+export function parsePortInput(raw: string): number | "auto" | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return "auto";
+  const n = Number(trimmed);
+  if (!Number.isInteger(n) || n < 1 || n > 65535) return null;
+  return n;
+}
+
 export default function App() {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
@@ -62,9 +70,13 @@ export default function App() {
     setActionError(null);
     try {
       const taken = instances.map((i) => i.port);
-      const portNum = port.trim()
-        ? Number(port)
-        : await api.suggestPort(engine, taken);
+      const parsed = parsePortInput(port);
+      if (parsed === null) {
+        setActionError("Port must be a number 1-65535");
+        return;
+      }
+      const portNum =
+        parsed === "auto" ? await api.suggestPort(engine, taken) : parsed;
       const chosenTag = tag || tagsForEngine[0] || "latest";
       await api.create(engine, chosenTag, portNum);
       setPort("");
@@ -174,6 +186,7 @@ export default function App() {
           onSelect={setSelectedId}
           selectedId={selectedId}
           actionError={actionError}
+          onActionError={setActionError}
         />
       </section>
       <section>
