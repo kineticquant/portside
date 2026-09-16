@@ -42,28 +42,35 @@ pub async fn container_logs(id: String, tail: Option<usize>) -> Result<String, S
 async fn check_query(inst: &crate::docker::Instance) -> bool {
     match inst.engine.as_str() {
         "mysql" | "mariadb" => {
-            let Ok(pool) =
-                sqlx::MySqlPool::connect(&crate::schemas::mysql_url("127.0.0.1", inst.port, "mysql"))
-                    .await
-            else {
+            let url = crate::schemas::mysql_url(
+                crate::schemas::local_host(),
+                inst.port,
+                "mysql",
+                &inst.password,
+                inst.tls(),
+            );
+            let Ok(pool) = sqlx::MySqlPool::connect(&url).await else {
                 return false;
             };
             sqlx::query("SELECT 1").fetch_one(&pool).await.is_ok()
         }
         "postgres" => {
-            let Ok(pool) =
-                sqlx::PgPool::connect(&crate::schemas::pg_url("127.0.0.1", inst.port, "postgres"))
-                    .await
-            else {
+            let url = crate::schemas::pg_url(
+                crate::schemas::local_host(),
+                inst.port,
+                "postgres",
+                &inst.password,
+                inst.tls(),
+            );
+            let Ok(pool) = sqlx::PgPool::connect(&url).await else {
                 return false;
             };
             sqlx::query("SELECT 1").fetch_one(&pool).await.is_ok()
         }
         "redis" | "valkey" => {
-            let Ok(client) = redis::Client::open(crate::schemas::redis_url(inst.port)) else {
-                return false;
-            };
-            let Ok(mut con) = client.get_multiplexed_async_connection().await else {
+            let Ok(mut con) =
+                crate::schemas::redis_conn(inst.port, &inst.password, inst.tls()).await
+            else {
                 return false;
             };
             redis::cmd("PING")

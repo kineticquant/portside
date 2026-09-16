@@ -6,7 +6,10 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-env.ps1",
+    "setup:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows.ps1",
+    "up": "npm install && npm run tauri dev"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.0",
@@ -14,7 +17,10 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0",
     "@testing-library/react": "^16.0.0",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.3.0",
     "jsdom": "^29.1.1",
     "typescript": "^5.5.0",

@@ -11,6 +11,8 @@ const pg: Instance = {
   container: "portside-a1",
   volume: "portside-a1-data",
   status: "running",
+  bind_ip: "127.0.0.1",
+  password: "portside",
 };
 
 describe("InstanceList", () => {
@@ -38,5 +40,10 @@ describe("InstanceList", () => {
       delete (navigator as unknown as Record<string, unknown>)["clipboard"];
       document.execCommand = origExec;
     }
+  });
+
+  it("keeps runtime state out of the instance table header", () => {
+    render(<InstanceList instances={[pg]} />);
+    expect(screen.queryByText(/docker (ready|down)/i)).toBeNull();
   });
 });

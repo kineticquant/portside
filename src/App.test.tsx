@@ -5,7 +5,7 @@ import App, { parsePortInput } from "./App";
 describe("App", () => {
   it("renders Portside heading", () => {
     render(<App />);
-    expect(screen.getByText(/portside/i)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /portside/i })).toBeTruthy();
   });
 });
 

@@ -65,16 +65,25 @@ export default function SchemaPanel({ instanceId, engine }: SchemaPanelProps) {
   }, [instanceId, engine, selectedDb]);
 
   if (!instanceId) {
-    return <p>Select an instance to manage schemas.</p>;
+    return (
+      <div className="ps-empty">
+        <strong>No instance selected</strong>
+        Select a row above to browse and manage its databases.
+      </div>
+    );
   }
 
   if (engine === "redis" || engine === "valkey") {
     return (
       <div>
         <h2>Schemas</h2>
-        <p>Redis has no schemas; showing keyspace info instead.</p>
-        {info ? <pre>{info}</pre> : null}
-        {error ? <p role="alert">{error}</p> : null}
+        <p className="ps-hint">Redis has no schemas; showing keyspace info instead.</p>
+        {info ? <pre className="ps-info-block">{info}</pre> : null}
+        {error ? (
+          <p role="alert" className="ps-alert">
+            {error}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -115,17 +124,22 @@ export default function SchemaPanel({ instanceId, engine }: SchemaPanelProps) {
   return (
     <div>
       <h2>Schemas</h2>
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="ps-alert">
+          {error}
+        </p>
+      ) : null}
       {databases.length === 0 ? (
-        <p>No databases found.</p>
+        <p className="ps-hint">No databases found.</p>
       ) : (
-        <ul>
+        <ul className="ps-list">
           {databases.map((db) => (
             <li key={db}>
               {db}{" "}
               {engine === "postgres" ? (
                 <button
                   type="button"
+                  className="ps-btn-ghost"
                   onClick={() => {
                     setSelectedDb(db);
                     setSchemas([]);
@@ -134,7 +148,11 @@ export default function SchemaPanel({ instanceId, engine }: SchemaPanelProps) {
                   View schemas
                 </button>
               ) : null}{" "}
-              <button type="button" onClick={() => void handleDrop(db)}>
+              <button
+                type="button"
+                className="ps-btn-ghost"
+                onClick={() => void handleDrop(db)}
+              >
                 Drop
               </button>
             </li>
@@ -144,11 +162,11 @@ export default function SchemaPanel({ instanceId, engine }: SchemaPanelProps) {
       {engine === "postgres" && selectedDb ? (
         <div>
           <h3>Schemas in {selectedDb}</h3>
-          <p>Schema list is read-only.</p>
+          <p className="ps-hint">Schema list is read-only.</p>
           {schemas.length === 0 ? (
-            <p>No schemas found.</p>
+            <p className="ps-hint">No schemas found.</p>
           ) : (
-            <ul>
+            <ul className="ps-list">
               {schemas.map((s) => (
                 <li key={s}>{s}</li>
               ))}
@@ -156,14 +174,15 @@ export default function SchemaPanel({ instanceId, engine }: SchemaPanelProps) {
           )}
         </div>
       ) : null}
-      <div>
+      <div className="ps-form-row">
         <input
+          className="ps-inline-input"
           aria-label="database name"
           placeholder="new database name"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <button type="button" onClick={() => void handleCreate()}>
+        <button type="button" className="ps-btn" onClick={() => void handleCreate()}>
           Create
         </button>
       </div>

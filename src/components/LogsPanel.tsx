@@ -32,14 +32,23 @@ export default function LogsPanel({ instanceId }: LogsPanelProps) {
   }, [instanceId]);
 
   if (!instanceId) {
-    return <p>Select an instance to view logs.</p>;
+    return (
+      <div className="ps-empty">
+        <strong>No logs yet</strong>
+        Select a row above to tail its container output, refreshed every 2s.
+      </div>
+    );
   }
 
   return (
     <div>
       <h2>Logs</h2>
-      {error ? <p role="alert">{error}</p> : null}
-      <pre>{logs || "No log output yet."}</pre>
+      {error ? (
+        <p role="alert" className="ps-alert">
+          {error}
+        </p>
+      ) : null}
+      <pre className="ps-logs">{logs || "No log output yet."}</pre>
     </div>
   );
 }

@@ -14,7 +14,8 @@ uuid = { version = "1", features = ["v4"] }
 dirs = "5"
 futures-util = "0.3"
 sqlx = { version = "0.8", features = ["mysql", "postgres", "runtime-tokio", "tls-native-tls"] }
-redis = { version = "0.27", features = ["tokio-comp"] }
+redis = { version = "0.27", features = ["tokio-comp", "tls-native-tls", "tokio-native-tls-comp"] }
+rcgen = "0.13"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -1,8 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod catalog;
+mod certs;
 mod docker;
+#[cfg(test)]
+mod e2e;
 mod health;
+mod prereqs;
 mod schemas;
 mod state;
 
@@ -23,6 +27,8 @@ fn main() {
             docker::list_instances,
             catalog::get_catalog,
             catalog::suggest_port,
+            certs::lan_addr,
+            certs::server_cert,
             schemas::list_databases,
             schemas::create_database,
             schemas::drop_database,
@@ -30,6 +36,9 @@ fn main() {
             schemas::redis_info,
             health::container_logs,
             health::health,
+            prereqs::check_prereqs,
+            prereqs::install_wsl,
+            prereqs::start_docker,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run portside");
