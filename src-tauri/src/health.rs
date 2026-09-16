@@ -13,9 +13,21 @@ impl Health {
     }
 }
 
+/// Imported servers have no container, so there is nothing to inspect:
+/// the container leg is trivially satisfied and TCP + query decide.
+fn effective_container_running(origin: &str, inspected_running: bool) -> bool {
+    if origin == "imported" {
+        return true;
+    }
+    inspected_running
+}
+
 #[tauri::command]
 pub async fn container_logs(id: String, tail: Option<usize>) -> Result<String, String> {
     let inst = crate::state::load_instance(&id)?;
+    if inst.origin == "imported" {
+        return Err("no container logs for imported servers".to_string());
+    }
     let docker = crate::docker::connect()?;
     let opts = bollard::container::LogsOptions::<String> {
         follow: false,
@@ -88,7 +100,7 @@ async fn check_query(inst: &crate::docker::Instance) -> bool {
 pub async fn health(id: String) -> Result<Health, String> {
     let inst = crate::state::load_instance(&id)?;
     let docker = crate::docker::connect()?;
-    let container_running = match docker.inspect_container(&inst.container, None).await {
+    let inspected_running = match docker.inspect_container(&inst.container, None).await {
         Ok(info) => info
             .state
             .as_ref()
@@ -96,9 +108,10 @@ pub async fn health(id: String) -> Result<Health, String> {
             .unwrap_or(false),
         Err(_) => false,
     };
+    let container_running = effective_container_running(&inst.origin, inspected_running);
     let tcp_open = tokio::time::timeout(
         std::time::Duration::from_secs(2),
-        tokio::net::TcpStream::connect(format!("127.0.0.1:{}", inst.port)),
+        tokio::net::TcpStream::connect(format!("{}:{}", inst.host, inst.port)),
     )
     .await
     .is_ok_and(|r| r.is_ok());
@@ -126,5 +139,12 @@ mod tests {
         assert!(!Health { container_running: true, tcp_open: true, query_ok: false }.is_healthy());
         assert!(!Health { container_running: false, tcp_open: true, query_ok: true }.is_healthy());
         assert!(!Health { container_running: true, tcp_open: false, query_ok: true }.is_healthy());
+    }
+
+    #[test]
+    fn imported_servers_have_no_container_concept() {
+        assert!(effective_container_running("imported", false));
+        assert!(!effective_container_running("managed", false));
+        assert!(effective_container_running("managed", true));
     }
 }
