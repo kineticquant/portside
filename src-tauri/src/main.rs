@@ -6,6 +6,7 @@ mod docker;
 #[cfg(test)]
 mod e2e;
 mod health;
+mod import;
 mod prereqs;
 mod schemas;
 mod state;
@@ -36,6 +37,12 @@ fn main() {
             schemas::redis_info,
             health::container_logs,
             health::health,
+            import::probe_connection,
+            import::import_external,
+            import::list_adoptable,
+            import::adopt_container,
+            import::list_pgadmin_servers,
+            import::forget_instance,
             prereqs::check_prereqs,
             prereqs::install_wsl,
             prereqs::start_docker,

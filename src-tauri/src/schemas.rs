@@ -2,8 +2,25 @@ fn userinfo(user: &str, password: &str) -> String {
     if password.is_empty() {
         user.to_string()
     } else {
-        format!("{user}:{password}")
+        format!("{}:{}", encode_userinfo(user), encode_userinfo(password))
     }
+}
+
+/// Percent-encode a URL userinfo part. Managed passwords are already
+/// policy-constrained to safe chars (no-op for them); imported servers
+/// can carry anything, and raw `@`, `:`, `/` would corrupt the URL.
+fn encode_userinfo(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9'
+            | b'-' | b'_' | b'.' | b'~'
+            | b'!' | b'$' | b'&' | b'\'' | b'(' | b')'
+            | b'*' | b'+' | b',' | b';' | b'=' => out.push(b as char),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
 }
 
 pub fn mysql_url(host: &str, port: u16, db: &str, user: &str, password: &str, tls: bool) -> String {
@@ -25,7 +42,7 @@ pub fn redis_url(host: &str, port: u16, password: &str, tls: bool) -> String {
     if password.is_empty() {
         format!("{scheme}://{host}:{port}/")
     } else {
-        format!("{scheme}://:{password}@{host}:{port}/")
+        format!("{scheme}://:{}@{host}:{port}/", encode_userinfo(password))
     }
 }
 
@@ -307,6 +324,12 @@ mod tests {
     fn redis_url_uses_given_host() {
         let url = redis_url("db.lan", 6380, "", false);
         assert_eq!(url, "redis://db.lan:6380/");
+    }
+
+    #[test]
+    fn userinfo_encoding_keeps_special_passwords_valid() {
+        let url = pg_url("db.lan", 5432, "mydb", "app", "p@ss:w/d", false);
+        assert_eq!(url, "postgres://app:p%40ss%3Aw%2Fd@db.lan:5432/mydb");
     }
 
     #[test]
