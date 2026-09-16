@@ -3,9 +3,10 @@ import { api } from "../lib/tauri";
 
 export type LogsPanelProps = {
   instanceId: string | null;
+  origin?: string;
 };
 
-export default function LogsPanel({ instanceId }: LogsPanelProps) {
+export default function LogsPanel({ instanceId, origin }: LogsPanelProps) {
   const [logs, setLogs] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +37,15 @@ export default function LogsPanel({ instanceId }: LogsPanelProps) {
       <div className="ps-empty">
         <strong>No logs yet</strong>
         Select a row above to tail its container output, refreshed every 2s.
+      </div>
+    );
+  }
+
+  if (origin === "imported") {
+    return (
+      <div className="ps-empty">
+        <strong>No logs here</strong>
+        Imported servers run elsewhere, so there is no container output to tail.
       </div>
     );
   }

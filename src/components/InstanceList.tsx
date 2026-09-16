@@ -7,6 +7,7 @@ export type InstanceListProps = {
   onStop?: (id: string) => void | Promise<void>;
   onRemove?: (id: string) => void | Promise<void>;
   onWipe?: (id: string) => void | Promise<void>;
+  onForget?: (id: string) => void | Promise<void>;
   onSelect?: (id: string) => void;
   selectedId?: string | null;
   actionError?: string | null;
@@ -48,6 +49,7 @@ export default function InstanceList({
   onStop,
   onRemove,
   onWipe,
+  onForget,
   onSelect,
   selectedId,
   actionError,
@@ -71,7 +73,7 @@ export default function InstanceList({
     try {
       await copyText(
         api.connectString(inst, {
-          host: lan && lanIp ? lanIp : "127.0.0.1",
+          host: lan && lanIp ? lanIp : inst.host || "127.0.0.1",
           strict,
         }),
       );
@@ -120,6 +122,7 @@ export default function InstanceList({
         <tbody>
           {instances.map((inst) => {
             const lan = isLan(inst);
+            const external = inst.origin === "imported";
             return (
             <tr
               key={inst.id}
@@ -128,10 +131,22 @@ export default function InstanceList({
             >
               <td>
                 {inst.engine}:{inst.tag}
-                <span className="ps-cell-sub">{inst.container}</span>
+                <span className="ps-cell-sub">
+                  {external ? (
+                    <span className="ps-badge" title="Registered here, running elsewhere">
+                      Imported
+                    </span>
+                  ) : inst.origin === "adopted" ? (
+                    <span className="ps-badge" title="Pre-existing container under management">
+                      Adopted
+                    </span>
+                  ) : (
+                    inst.container
+                  )}
+                </span>
               </td>
               <td>
-                127.0.0.1:{inst.port}
+                {inst.host || "127.0.0.1"}:{inst.port}
                 <span className="ps-cell-sub">
                   {lan ? (
                     <span
@@ -157,6 +172,7 @@ export default function InstanceList({
               </td>
               <td>
                 <div className="ps-actions">
+                  {!external ? (
                   <div className="ps-act-group" role="group" aria-label="lifecycle">
                     <button
                       type="button"
@@ -181,6 +197,7 @@ export default function InstanceList({
                       Inactivate
                     </button>
                   </div>
+                  ) : null}
                   <div className="ps-act-group" role="group" aria-label="connect">
                     <button
                       type="button"
@@ -226,6 +243,26 @@ export default function InstanceList({
                     ) : null}
                   </div>
                   <div className="ps-act-group" role="group" aria-label="danger">
+                    {external ? (
+                    <button
+                      type="button"
+                      className="ps-btn-ghost"
+                      title="Forget: delete Portside's record only. The server itself is untouched."
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (
+                          window.confirm(
+                            `Forget ${inst.engine} on ${inst.host || "127.0.0.1"}:${inst.port}?\nThis deletes Portside's record only. The server itself is untouched.`,
+                          )
+                        ) {
+                          void onForget?.(inst.id);
+                        }
+                      }}
+                    >
+                      Forget
+                    </button>
+                    ) : (
+                    <>
                     <button
                       type="button"
                       className="ps-btn-ghost"
@@ -240,7 +277,12 @@ export default function InstanceList({
                     <button
                       type="button"
                       className="ps-btn-danger"
-                      title={`Wipe: delete container AND data volume ${inst.volume}. Destructive.`}
+                      title={
+                        inst.volume
+                          ? `Wipe: delete container AND data volume ${inst.volume}. Destructive.`
+                          : "Wipe unavailable: no known data volume for this container."
+                      }
+                      disabled={!inst.volume}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (
@@ -254,6 +296,8 @@ export default function InstanceList({
                     >
                       Wipe
                     </button>
+                    </>
+                    )}
                   </div>
                 </div>
               </td>

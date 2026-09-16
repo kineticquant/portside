@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import ImportDialog from "./components/ImportDialog";
 import InfoTip from "./components/InfoTip";
 import InstanceList from "./components/InstanceList";
 import LogsPanel from "./components/LogsPanel";
@@ -31,6 +32,7 @@ export default function App() {
   const [lan, setLan] = useState(false);
   const [password, setPassword] = useState("");
   const [lanAddr, setLanAddr] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [strict, setStrict] = useState(
     () => localStorage.getItem("ps-strict-tls") === "1",
   );
@@ -207,6 +209,18 @@ export default function App() {
     }
   };
 
+  // Forget = delete Portside's record for an imported row. The server
+  // itself is never touched (enforced backend-side too).
+  const handleForget = async (id: string) => {
+    try {
+      await api.forget(id);
+      if (selectedId === id) setSelectedId(null);
+      await refreshInstances();
+    } catch (e) {
+      setActionError(String(e));
+    }
+  };
+
   const selected = instances.find((i) => i.id === selectedId) ?? null;
 
   useEffect(() => {
@@ -265,9 +279,14 @@ export default function App() {
       <section className="ps-card ps-instances">
         <div className="ps-card-head">
           <h2>Instances</h2>
-          <button type="button" className="ps-btn" onClick={openCreate}>
-            Create instance
-          </button>
+          <div className="ps-form-actions">
+            <button type="button" className="ps-btn-ghost" onClick={() => setImportOpen(true)}>
+              Import
+            </button>
+            <button type="button" className="ps-btn" onClick={openCreate}>
+              Create instance
+            </button>
+          </div>
         </div>
         <InstanceList
           instances={instances}
@@ -275,6 +294,7 @@ export default function App() {
           onStop={handleStop}
           onRemove={handleRemove}
           onWipe={handleWipe}
+          onForget={handleForget}
           onSelect={setSelectedId}
           selectedId={selectedId}
           actionError={actionError}
@@ -315,9 +335,14 @@ export default function App() {
               </span>
             </div>
           ) : null}
-          <LogsPanel instanceId={selected?.id ?? null} />
+          <LogsPanel instanceId={selected?.id ?? null} origin={selected?.origin} />
         </section>
       </div>
+      <ImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onDone={() => void refreshInstances()}
+      />
       <dialog
         ref={createDialogRef}
         className="ps-dialog"
