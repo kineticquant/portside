@@ -24,6 +24,17 @@ pub struct Instance {
     /// User-set at creation (engine default when empty at the API boundary,
     /// resolved to the default before storage). Stored plaintext in SQLite.
     pub password: String,
+    /// "managed" (created by Portside) | "imported" (external server) |
+    /// "adopted" (pre-existing Docker container brought under management).
+    pub origin: String,
+    /// Connection host. Always loopback for managed rows; the real host
+    /// for imported rows.
+    pub host: String,
+    /// Connection user. Empty means the engine default (root / postgres).
+    pub db_user: String,
+    /// TLS posture for non-managed rows: "" (off), "off", or "require".
+    /// Managed rows keep the bind_ip rule below.
+    pub ssl: String,
 }
 
 impl Instance {
@@ -38,11 +49,88 @@ impl Instance {
             status: "created".to_string(),
             bind_ip: bind_ip.to_string(),
             password: password.to_string(),
+            origin: "managed".to_string(),
+            host: "127.0.0.1".to_string(),
+            db_user: String::new(),
+            ssl: String::new(),
+        }
+    }
+
+    /// Row for an external server Portside doesn't own: no container,
+    /// no volume, no lifecycle. Health, browsing, and connect strings
+    /// are the whole feature set.
+    pub fn external(
+        id: &str,
+        engine: &str,
+        host: &str,
+        port: u16,
+        user: &str,
+        password: &str,
+        ssl: &str,
+    ) -> Self {
+        Self {
+            id: id.to_string(),
+            engine: engine.to_string(),
+            tag: "external".to_string(),
+            port,
+            container: String::new(),
+            volume: String::new(),
+            status: "external".to_string(),
+            bind_ip: "127.0.0.1".to_string(),
+            password: password.to_string(),
+            origin: "imported".to_string(),
+            host: host.to_string(),
+            db_user: user.to_string(),
+            ssl: ssl.to_string(),
+        }
+    }
+
+    /// Row for a pre-existing Docker container adopted into management.
+    /// Lifecycle (start/stop/remove) works; wipe needs a known volume.
+    pub fn adopted(
+        id: &str,
+        engine: &str,
+        tag: &str,
+        port: u16,
+        container: &str,
+        volume: &str,
+        status: &str,
+    ) -> Self {
+        Self {
+            id: id.to_string(),
+            engine: engine.to_string(),
+            tag: tag.to_string(),
+            port,
+            container: container.to_string(),
+            volume: volume.to_string(),
+            status: status.to_string(),
+            bind_ip: "127.0.0.1".to_string(),
+            password: String::new(),
+            origin: "adopted".to_string(),
+            host: "127.0.0.1".to_string(),
+            db_user: String::new(),
+            ssl: String::new(),
+        }
+    }
+
+    /// Effective login user: the saved one, or the engine default.
+    pub fn db_user_or_default(&self) -> &str {
+        if self.db_user.is_empty() {
+            match self.engine.as_str() {
+                "postgres" => "postgres",
+                _ => "root",
+            }
+        } else {
+            &self.db_user
         }
     }
 
     /// LAN-bound instances serve TLS; localhost stays plaintext (pgAdmin posture).
+    /// Non-managed rows use their own ssl flag instead of the bind rule.
     pub fn tls(&self) -> bool {
+        if self.origin != "managed" {
+            return self.ssl == "require";
+        }
         self.bind_ip != "127.0.0.1" && self.bind_ip != "localhost"
     }
 
@@ -554,5 +642,29 @@ mod tests {
         assert!(inst.tls());
         let cmd = cmd_for_engine("postgres", true, "s3cret!").expect("tls cmd");
         assert!(cmd.contains(&"ssl=on".to_string()));
+    }
+
+    #[test]
+    fn external_instance_uses_given_host_and_user() {
+        let inst = Instance::external("e1", "postgres", "db.lan", 5432, "app", "pw", "require");
+        assert_eq!(inst.origin, "imported");
+        assert_eq!(inst.host, "db.lan");
+        assert_eq!(inst.db_user_or_default(), "app");
+        assert!(inst.tls());
+    }
+
+    #[test]
+    fn blank_user_falls_back_to_engine_default() {
+        let inst = Instance::external("e2", "postgres", "db.lan", 5432, "", "pw", "off");
+        assert_eq!(inst.db_user_or_default(), "postgres");
+        assert!(!inst.tls());
+    }
+
+    #[test]
+    fn managed_tls_rule_is_unchanged() {
+        let lan = Instance::new("a", "postgres", "17", 5433, "0.0.0.0", "pw");
+        let local = Instance::new("b", "postgres", "17", 5434, "127.0.0.1", "pw");
+        assert!(lan.tls());
+        assert!(!local.tls());
     }
 }

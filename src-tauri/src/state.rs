@@ -16,13 +16,21 @@ pub fn db() -> Result<Connection, String> {
           id TEXT PRIMARY KEY, engine TEXT, tag TEXT, port INTEGER,
           container TEXT, volume TEXT, status TEXT,
           bind_ip TEXT NOT NULL DEFAULT '127.0.0.1',
-          password TEXT NOT NULL DEFAULT '');",
+          password TEXT NOT NULL DEFAULT '',
+          origin TEXT NOT NULL DEFAULT 'managed',
+          host TEXT NOT NULL DEFAULT '127.0.0.1',
+          db_user TEXT NOT NULL DEFAULT '',
+          ssl TEXT NOT NULL DEFAULT '');",
     )
     .map_err(|e| e.to_string())?;
-    // Migrations for DBs created before bind_ip/password existed.
+    // Migrations for DBs created before each column existed.
     for stmt in [
         "ALTER TABLE instances ADD COLUMN bind_ip TEXT NOT NULL DEFAULT '127.0.0.1'",
         "ALTER TABLE instances ADD COLUMN password TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE instances ADD COLUMN origin TEXT NOT NULL DEFAULT 'managed'",
+        "ALTER TABLE instances ADD COLUMN host TEXT NOT NULL DEFAULT '127.0.0.1'",
+        "ALTER TABLE instances ADD COLUMN db_user TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE instances ADD COLUMN ssl TEXT NOT NULL DEFAULT ''",
     ] {
         let _ = conn.execute_batch(stmt);
     }
@@ -40,13 +48,17 @@ fn row_to_instance(row: &rusqlite::Row) -> rusqlite::Result<Instance> {
         status: row.get(6)?,
         bind_ip: row.get(7)?,
         password: row.get(8)?,
+        origin: row.get(9)?,
+        host: row.get(10)?,
+        db_user: row.get(11)?,
+        ssl: row.get(12)?,
     })
 }
 
 pub fn save_instance(inst: &Instance) -> Result<(), String> {
     db()?.execute(
-        "INSERT OR REPLACE INTO instances(id, engine, tag, port, container, volume, status, bind_ip, password)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT OR REPLACE INTO instances(id, engine, tag, port, container, volume, status, bind_ip, password, origin, host, db_user, ssl)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         params![
             inst.id,
             inst.engine,
@@ -56,7 +68,11 @@ pub fn save_instance(inst: &Instance) -> Result<(), String> {
             inst.volume,
             inst.status,
             inst.bind_ip,
-            inst.password
+            inst.password,
+            inst.origin,
+            inst.host,
+            inst.db_user,
+            inst.ssl
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -66,7 +82,7 @@ pub fn save_instance(inst: &Instance) -> Result<(), String> {
 pub fn load_instance(id: &str) -> Result<Instance, String> {
     let conn = db()?;
     conn.query_row(
-        "SELECT id, engine, tag, port, container, volume, status, bind_ip, password FROM instances WHERE id = ?1",
+        "SELECT id, engine, tag, port, container, volume, status, bind_ip, password, origin, host, db_user, ssl FROM instances WHERE id = ?1",
         params![id],
         row_to_instance,
     )
@@ -79,7 +95,7 @@ pub fn load_instance(id: &str) -> Result<Instance, String> {
 pub fn list_saved_instances() -> Result<Vec<Instance>, String> {
     let conn = db()?;
     let mut stmt = conn
-        .prepare("SELECT id, engine, tag, port, container, volume, status, bind_ip, password FROM instances ORDER BY id")
+        .prepare("SELECT id, engine, tag, port, container, volume, status, bind_ip, password, origin, host, db_user, ssl FROM instances ORDER BY id")
         .map_err(|e| e.to_string())?;
     let rows: Vec<Instance> = stmt
         .query_map([], row_to_instance)
