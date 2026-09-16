@@ -6,45 +6,40 @@ fn userinfo(user: &str, password: &str) -> String {
     }
 }
 
-pub fn mysql_url(host: &str, port: u16, db: &str, password: &str, tls: bool) -> String {
+pub fn mysql_url(host: &str, port: u16, db: &str, user: &str, password: &str, tls: bool) -> String {
     // Passwords are policy-constrained to URL-safe chars, so no escaping needed.
     let ssl = if tls { "?ssl-mode=REQUIRED" } else { "" };
-    format!("mysql://{}@{host}:{port}/{db}{ssl}", userinfo("root", password))
+    format!("mysql://{}@{host}:{port}/{db}{ssl}", userinfo(user, password))
 }
 
-pub fn pg_url(host: &str, port: u16, db: &str, password: &str, tls: bool) -> String {
+pub fn pg_url(host: &str, port: u16, db: &str, user: &str, password: &str, tls: bool) -> String {
     let ssl = if tls { "?sslmode=require" } else { "" };
     format!(
         "postgres://{}@{host}:{port}/{db}{ssl}",
-        userinfo("postgres", password)
+        userinfo(user, password)
     )
 }
 
-pub fn redis_url(port: u16, password: &str, tls: bool) -> String {
+pub fn redis_url(host: &str, port: u16, password: &str, tls: bool) -> String {
     let scheme = if tls { "rediss" } else { "redis" };
     if password.is_empty() {
-        format!("{scheme}://127.0.0.1:{port}/")
+        format!("{scheme}://{host}:{port}/")
     } else {
-        format!("{scheme}://:{password}@127.0.0.1:{port}/")
+        format!("{scheme}://:{password}@{host}:{port}/")
     }
-}
-
-/// Connection host for server-side checks: always loopback (the daemon and
-/// the DBs live on this box even when the instance is LAN-bound).
-pub fn local_host() -> &'static str {
-    "127.0.0.1"
 }
 
 /// Redis client honoring password + TLS. LAN instances serve a self-signed
 /// cert and default posture is encryption-without-verification (pgAdmin
 /// style), so TLS connections skip chain verification.
 pub fn redis_client(
+    host: &str,
     port: u16,
     password: &str,
     tls: bool,
 ) -> Result<redis::Client, String> {
     if !tls {
-        return redis::Client::open(redis_url(port, password, false))
+        return redis::Client::open(redis_url(host, port, password, false))
             .map_err(|e| e.to_string());
     }
     let pw = if password.is_empty() {
@@ -54,7 +49,7 @@ pub fn redis_client(
     };
     let info = redis::ConnectionInfo {
         addr: redis::ConnectionAddr::TcpTls {
-            host: "127.0.0.1".to_string(),
+            host: host.to_string(),
             port,
             insecure: true,
             tls_params: None,
@@ -72,11 +67,12 @@ pub fn redis_client(
 /// Authenticated multiplexed connection. Password instances require AUTH
 /// before any command (including PING) - anonymous PING gets NOAUTH.
 pub async fn redis_conn(
+    host: &str,
     port: u16,
     password: &str,
     tls: bool,
 ) -> Result<redis::aio::MultiplexedConnection, String> {
-    let client = redis_client(port, password, tls)?;
+    let client = redis_client(host, port, password, tls)?;
     let mut con = client
         .get_multiplexed_async_connection()
         .await
@@ -103,7 +99,7 @@ pub async fn list_databases(id: String) -> Result<Vec<String>, String> {
     let inst = crate::state::load_instance(&id)?;
     match inst.engine.as_str() {
         "mysql" | "mariadb" => {
-            let pool = sqlx::MySqlPool::connect(&mysql_url(local_host(), inst.port, "mysql", &inst.password, inst.tls()))
+            let pool = sqlx::MySqlPool::connect(&mysql_url(&inst.host, inst.port, "mysql", inst.db_user_or_default(), &inst.password, inst.tls()))
                 .await
                 .map_err(|e| e.to_string())?;
             // NOTE: MySQL 8.4 types these name columns VARBINARY, which
@@ -122,7 +118,7 @@ pub async fn list_databases(id: String) -> Result<Vec<String>, String> {
                 .collect())
         }
         "postgres" => {
-            let pool = sqlx::PgPool::connect(&pg_url(local_host(), inst.port, "postgres", &inst.password, inst.tls()))
+            let pool = sqlx::PgPool::connect(&pg_url(&inst.host, inst.port, "postgres", inst.db_user_or_default(), &inst.password, inst.tls()))
                 .await
                 .map_err(|e| e.to_string())?;
             let rows: Vec<(String,)> = sqlx::query_as(
@@ -134,7 +130,7 @@ pub async fn list_databases(id: String) -> Result<Vec<String>, String> {
             Ok(rows.into_iter().map(|r| r.0).collect())
         }
         "redis" | "valkey" => {
-            let mut con = redis_conn(inst.port, &inst.password, inst.tls()).await?;
+            let mut con = redis_conn(&inst.host, inst.port, &inst.password, inst.tls()).await?;
             let n: usize = redis::cmd("DBSIZE")
                 .query_async(&mut con)
                 .await
@@ -151,7 +147,7 @@ pub async fn create_database(id: String, name: String) -> Result<(), String> {
     let inst = crate::state::load_instance(&id)?;
     match inst.engine.as_str() {
         "mysql" | "mariadb" => {
-            let pool = sqlx::MySqlPool::connect(&mysql_url(local_host(), inst.port, "mysql", &inst.password, inst.tls()))
+            let pool = sqlx::MySqlPool::connect(&mysql_url(&inst.host, inst.port, "mysql", inst.db_user_or_default(), &inst.password, inst.tls()))
                 .await
                 .map_err(|e| e.to_string())?;
             sqlx::query(&format!("CREATE DATABASE `{name}`"))
@@ -161,7 +157,7 @@ pub async fn create_database(id: String, name: String) -> Result<(), String> {
             Ok(())
         }
         "postgres" => {
-            let pool = sqlx::PgPool::connect(&pg_url(local_host(), inst.port, "postgres", &inst.password, inst.tls()))
+            let pool = sqlx::PgPool::connect(&pg_url(&inst.host, inst.port, "postgres", inst.db_user_or_default(), &inst.password, inst.tls()))
                 .await
                 .map_err(|e| e.to_string())?;
             sqlx::query(&format!("CREATE DATABASE \"{name}\""))
@@ -180,7 +176,7 @@ pub async fn drop_database(id: String, name: String) -> Result<(), String> {
     let inst = crate::state::load_instance(&id)?;
     match inst.engine.as_str() {
         "mysql" | "mariadb" => {
-            let pool = sqlx::MySqlPool::connect(&mysql_url(local_host(), inst.port, "mysql", &inst.password, inst.tls()))
+            let pool = sqlx::MySqlPool::connect(&mysql_url(&inst.host, inst.port, "mysql", inst.db_user_or_default(), &inst.password, inst.tls()))
                 .await
                 .map_err(|e| e.to_string())?;
             sqlx::query(&format!("DROP DATABASE `{name}`"))
@@ -190,7 +186,7 @@ pub async fn drop_database(id: String, name: String) -> Result<(), String> {
             Ok(())
         }
         "postgres" => {
-            let pool = sqlx::PgPool::connect(&pg_url(local_host(), inst.port, "postgres", &inst.password, inst.tls()))
+            let pool = sqlx::PgPool::connect(&pg_url(&inst.host, inst.port, "postgres", inst.db_user_or_default(), &inst.password, inst.tls()))
                 .await
                 .map_err(|e| e.to_string())?;
             sqlx::query(&format!("DROP DATABASE \"{name}\""))
@@ -209,7 +205,7 @@ pub async fn list_schemas(id: String, db: String) -> Result<Vec<String>, String>
     match inst.engine.as_str() {
         "postgres" => {
             let target = if db.is_empty() { "postgres".to_string() } else { db };
-            let pool = sqlx::PgPool::connect(&pg_url(local_host(), inst.port, &target, &inst.password, inst.tls()))
+            let pool = sqlx::PgPool::connect(&pg_url(&inst.host, inst.port, &target, inst.db_user_or_default(), &inst.password, inst.tls()))
                 .await
                 .map_err(|e| e.to_string())?;
             let rows: Vec<(String,)> = sqlx::query_as(
@@ -232,7 +228,7 @@ pub async fn redis_info(id: String) -> Result<String, String> {
     let inst = crate::state::load_instance(&id)?;
     match inst.engine.as_str() {
         "redis" | "valkey" => {
-            let mut con = redis_conn(inst.port, &inst.password, inst.tls()).await?;
+            let mut con = redis_conn(&inst.host, inst.port, &inst.password, inst.tls()).await?;
             let pong: String = redis::cmd("PING")
                 .query_async(&mut con)
                 .await
@@ -261,13 +257,13 @@ mod tests {
     use super::*;
     #[test]
     fn mysql_connection_url_has_port_and_db() {
-        let url = mysql_url("127.0.0.1", 3307, "mydb", "portside", false);
+        let url = mysql_url("127.0.0.1", 3307, "mydb", "root", "portside", false);
         assert_eq!(url, "mysql://root:portside@127.0.0.1:3307/mydb");
     }
 
     #[test]
     fn mysql_tls_url_requires_ssl() {
-        let url = mysql_url("192.168.1.10", 3307, "mydb", "s3cret!", true);
+        let url = mysql_url("192.168.1.10", 3307, "mydb", "root", "s3cret!", true);
         assert_eq!(
             url,
             "mysql://root:s3cret!@192.168.1.10:3307/mydb?ssl-mode=REQUIRED"
@@ -276,13 +272,13 @@ mod tests {
 
     #[test]
     fn pg_connection_url_has_port_and_db() {
-        let url = pg_url("127.0.0.1", 5433, "mydb", "portside", false);
+        let url = pg_url("127.0.0.1", 5433, "mydb", "postgres", "portside", false);
         assert_eq!(url, "postgres://postgres:portside@127.0.0.1:5433/mydb");
     }
 
     #[test]
     fn pg_tls_url_requires_ssl() {
-        let url = pg_url("192.168.1.10", 5433, "mydb", "s3cret!", true);
+        let url = pg_url("192.168.1.10", 5433, "mydb", "postgres", "s3cret!", true);
         assert_eq!(
             url,
             "postgres://postgres:s3cret!@192.168.1.10:5433/mydb?sslmode=require"
@@ -290,15 +286,27 @@ mod tests {
     }
 
     #[test]
+    fn pg_url_uses_custom_user_and_host() {
+        let url = pg_url("db.lan", 5433, "mydb", "app", "pw", false);
+        assert_eq!(url, "postgres://app:pw@db.lan:5433/mydb");
+    }
+
+    #[test]
     fn redis_url_has_port_no_auth() {
-        let url = redis_url(6380, "", false);
+        let url = redis_url("127.0.0.1", 6380, "", false);
         assert_eq!(url, "redis://127.0.0.1:6380/");
     }
 
     #[test]
     fn redis_tls_url_uses_rediss_scheme() {
-        let url = redis_url(6380, "s3cret!", true);
+        let url = redis_url("127.0.0.1", 6380, "s3cret!", true);
         assert_eq!(url, "rediss://:s3cret!@127.0.0.1:6380/");
+    }
+
+    #[test]
+    fn redis_url_uses_given_host() {
+        let url = redis_url("db.lan", 6380, "", false);
+        assert_eq!(url, "redis://db.lan:6380/");
     }
 
     #[test]

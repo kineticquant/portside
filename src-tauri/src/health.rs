@@ -43,9 +43,10 @@ async fn check_query(inst: &crate::docker::Instance) -> bool {
     match inst.engine.as_str() {
         "mysql" | "mariadb" => {
             let url = crate::schemas::mysql_url(
-                crate::schemas::local_host(),
+                &inst.host,
                 inst.port,
                 "mysql",
+                inst.db_user_or_default(),
                 &inst.password,
                 inst.tls(),
             );
@@ -56,9 +57,10 @@ async fn check_query(inst: &crate::docker::Instance) -> bool {
         }
         "postgres" => {
             let url = crate::schemas::pg_url(
-                crate::schemas::local_host(),
+                &inst.host,
                 inst.port,
                 "postgres",
+                inst.db_user_or_default(),
                 &inst.password,
                 inst.tls(),
             );
@@ -69,7 +71,7 @@ async fn check_query(inst: &crate::docker::Instance) -> bool {
         }
         "redis" | "valkey" => {
             let Ok(mut con) =
-                crate::schemas::redis_conn(inst.port, &inst.password, inst.tls()).await
+                crate::schemas::redis_conn(&inst.host, inst.port, &inst.password, inst.tls()).await
             else {
                 return false;
             };
