@@ -10,10 +10,26 @@ export type Instance = {
   status: string;
   bind_ip: string;
   password: string;
+  /** "managed" (Portside-created) | "imported" (external) | "adopted" (container). */
+  origin: string;
+  /** Connection host: loopback for managed rows, the real host otherwise. */
+  host: string;
+  /** Connection user: "" means the engine default (root / postgres). */
+  db_user: string;
+  /** TLS posture for non-managed rows: "" | "off" | "require". */
+  ssl: string;
 };
 
 export function isLan(i: Pick<Instance, "bind_ip">): boolean {
   return i.bind_ip !== "127.0.0.1" && i.bind_ip !== "localhost";
+}
+
+export function isExternal(i: Pick<Instance, "origin">): boolean {
+  return i.origin === "imported" || i.origin === "adopted";
+}
+
+function defaultUser(engine: string): string {
+  return engine === "postgres" ? "postgres" : "root";
 }
 
 function defaultPassword(engine: string): string {
@@ -29,6 +45,29 @@ export type CatalogEntry = {
 export type Catalog = {
   updated?: string;
   entries: CatalogEntry[];
+};
+
+export type ProbeResult = {
+  ok: boolean;
+  version: string | null;
+  error: string | null;
+};
+
+export type Adoptable = {
+  container: string;
+  engine: string;
+  tag: string;
+  port: number | null;
+  volume: string;
+  status: string;
+};
+
+export type PgServer = {
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  database: string;
 };
 
 export type Health = {
@@ -59,18 +98,29 @@ export type ConnectOpts = {
 /**
  * pgAdmin posture by default: TLS when the instance serves it, verification
  * off. Strict mode appends verify-ca parameters (pair with Cert download).
+ * Imported rows point at their own host/user and use their ssl flag.
  */
 export function connectString(
   i: Pick<Instance, "engine" | "port"> & {
     password?: string;
     bind_ip?: string;
+    host?: string;
+    db_user?: string;
+    ssl?: string;
+    origin?: string;
   },
   opts: ConnectOpts = {},
 ): string {
-  const host = opts.host ?? "127.0.0.1";
+  const host = opts.host ?? i.host ?? "127.0.0.1";
   const pw = i.password || defaultPassword(i.engine);
-  const userinfo = pw ? `${userFor(i.engine)}:${pw}@` : `${userFor(i.engine)}@`;
-  const tls = "bind_ip" in i ? isLan(i as Pick<Instance, "bind_ip">) : false;
+  const user = i.db_user || userFor(i.engine);
+  const userinfo = pw ? `${user}:${pw}@` : `${user}@`;
+  const tls =
+    i.origin === "imported" || i.origin === "adopted"
+      ? i.ssl === "require"
+      : "bind_ip" in i
+        ? isLan(i as Pick<Instance, "bind_ip">)
+        : false;
   if (i.engine === "postgres") {
     const ssl = tls
       ? opts.strict
@@ -133,6 +183,14 @@ export const api = {
   logs: (id: string, tail = 200) =>
     invoke<string>("container_logs", { id, tail }),
   health: (id: string) => invoke<Health>("health", { id }),
+  probe: (engine: string, host: string, port: number, user: string, password: string, ssl: string) =>
+    invoke<ProbeResult>("probe_connection", { engine, host, port, user, password, ssl }),
+  importExternal: (engine: string, host: string, port: number, user: string, password: string, ssl: string) =>
+    invoke<Instance>("import_external", { engine, host, port, user, password, ssl }),
+  adoptable: () => invoke<Adoptable[]>("list_adoptable"),
+  adopt: (container: string) => invoke<Instance>("adopt_container", { container }),
+  pgadmin: () => invoke<PgServer[]>("list_pgadmin_servers"),
+  forget: (id: string) => invoke<void>("forget_instance", { id }),
   prereqs: () => invoke<Prereqs>("check_prereqs"),
   installWsl: () => invoke<string>("install_wsl"),
   startDocker: () => invoke<string>("start_docker"),

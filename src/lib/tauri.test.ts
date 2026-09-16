@@ -61,4 +61,32 @@ describe("connectString", () => {
       ),
     ).toBe("postgres://postgres:pw@192.168.1.10:5433/postgres?sslmode=verify-ca");
   });
+
+  it("points connect strings at the imported host and user", () => {
+    expect(
+      connectString({
+        engine: "postgres",
+        port: 5432,
+        host: "db.lan",
+        db_user: "app",
+        password: "pw",
+        ssl: "off",
+        bind_ip: "127.0.0.1",
+      }),
+    ).toBe("postgres://app:pw@db.lan:5432/postgres");
+  });
+
+  it("requires TLS for imported ssl=require rows", () => {
+    expect(
+      connectString({
+        engine: "postgres",
+        port: 5432,
+        host: "db.lan",
+        password: "pw",
+        ssl: "require",
+        origin: "imported",
+        bind_ip: "127.0.0.1",
+      }),
+    ).toBe("postgres://postgres:pw@db.lan:5432/postgres?sslmode=require");
+  });
 });

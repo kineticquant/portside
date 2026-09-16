@@ -13,6 +13,10 @@ const pg: Instance = {
   status: "running",
   bind_ip: "127.0.0.1",
   password: "portside",
+  origin: "managed",
+  host: "127.0.0.1",
+  db_user: "",
+  ssl: "",
 };
 
 describe("InstanceList", () => {
