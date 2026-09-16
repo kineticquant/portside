@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="230" fill="#1b1e23"/>
+  <g>
+    <rect x="252" y="212" width="560" height="150" rx="30" fill="#5ad6a5"/>
+    <g stroke="#3a9e78" stroke-width="10">
+      <line x1="352" y1="222" x2="352" y2="352"/>
+      <line x1="452" y1="222" x2="452" y2="352"/>
+      <line x1="552" y1="222" x2="552" y2="352"/>
+      <line x1="652" y1="222" x2="652" y2="352"/>
+    </g>
+    <rect x="172" y="402" width="560" height="150" rx="30" fill="#eef1f4"/>
+    <g stroke="#b9c1c9" stroke-width="10">
+      <line x1="272" y1="412" x2="272" y2="542"/>
+      <line x1="372" y1="412" x2="372" y2="542"/>
+      <line x1="472" y1="412" x2="472" y2="542"/>
+      <line x1="572" y1="412" x2="572" y2="542"/>
+    </g>
+    <rect x="252" y="592" width="560" height="150" rx="30" fill="#e3c775"/>
+    <g stroke="#a98f3f" stroke-width="10">
+      <line x1="352" y1="602" x2="352" y2="732"/>
+      <line x1="452" y1="602" x2="452" y2="732"/>
+      <line x1="552" y1="602" x2="552" y2="732"/>
+      <line x1="652" y1="602" x2="652" y2="732"/>
+    </g>
+  </g>
+</svg>
