@@ -67,3 +67,7 @@ cargo test --manifest-path src-tauri/Cargo.toml   # Rust (needs cargo)
 
 Releases are built by `.github/workflows/release.yml` for Windows, macOS
 (Intel + ARM), and Linux.
+
+## License
+
+MIT. See `LICENSE`.
