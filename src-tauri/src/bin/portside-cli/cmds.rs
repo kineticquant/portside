@@ -292,7 +292,7 @@ pub async fn run(cmd: Cmd, as_json: bool) {
                 }
             }
         }
-        Cmd::Mcp => usage("mcp server lands in Task 5"),
+        Cmd::Mcp => unreachable!("the mcp server is dispatched in main"),
     }
 }
 

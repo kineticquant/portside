@@ -24,10 +24,11 @@ via the local orchestrator (no inbound daemon in V1).
 - New crate member / binary `portside-cli` (clap v4, tokio): parses
   argv, calls `core`, prints human table by default and `--json` for
   agents. Single `cargo build` → `portside-cli(.exe)`.
-- MCP = `portside-cli mcp` subcommand over stdio using `rmcp`
-  (Model Context Protocol, JSON-RPC). No second server codebase, no
-  Node/Python runtime at invoke time. Stdio keeps it local-first and
-  composable with every MCP host.
+- MCP = `portside-cli mcp` subcommand over stdio: hand-rolled
+  newline-delimited JSON-RPC 2.0 on serde_json+tokio (zero new protocol
+  deps, exact 11-tool surface, integration-tested). No second server
+  codebase, no Node/Python runtime at invoke time. Stdio keeps it
+  local-first and composable with every MCP host.
 
 Why not B (Node MCP duplicating Docker/SQLite logic): drift risk on
 every catalog/engine/TLS change. Why not C (HTTP daemon): needs auth,
@@ -90,7 +91,7 @@ TLS (`verify-ca`) stays opt-in; default stays pgAdmin posture
 ## Files touched
 
 - `src-tauri/`: refactor `src/*.rs` → `src/core/*.rs` + thin command
-  wrappers; `Cargo.toml` (+clap/rmcp deps on the CLI member only);
+  wrappers; `Cargo.toml` (+clap dep only);
   `src/catalog.json` unchanged (shared via `include_str!`).
 - New `src-cli/{main.rs, mcp.rs, output.rs}` (~600-900 LOC total).
 - `docs/superpowers/specs/2026-10-11-agent-interface-design.md` (this file).
@@ -119,7 +120,7 @@ TLS (`verify-ca`) stays opt-in; default stays pgAdmin posture
   create/drop db → conn strings connect → rm --wipe. Gated behind
   `PORTSIDE_E2E=1` so plain `cargo test` stays offline.
 - MCP: stdio handshake smoke test (initialize → tools/list →
-  tools/call `list_catalog`) via `rmcp` test client.
+  tools/call `list_catalog`) against the real stdio binary.
 - Manual: register `portside-cli mcp` in opencode + Claude Code, prompt
   "stand up postgres 17 with a database called demo and give me the
   connect string", verify one-shot ready URL.
