@@ -1,15 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod catalog;
-mod certs;
-mod docker;
-#[cfg(test)]
-mod e2e;
-mod health;
-mod import;
-mod prereqs;
-mod schemas;
-mod state;
+use portside::{catalog, certs, docker, health, import, prereqs, schemas};
 
 #[tauri::command]
 fn ping() -> String {
