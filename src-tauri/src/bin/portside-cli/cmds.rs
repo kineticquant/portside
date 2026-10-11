@@ -178,11 +178,165 @@ pub async fn run(cmd: Cmd, as_json: bool) {
                     }
                 }
             }
-            _ => usage("db create/drop land in Task 4"),
+            DbCmd::Create { id, name } => {
+                portside::schemas::create_database(id, name)
+                    .await
+                    .unwrap_or_else(|e| {
+                        // Validation errors (bad name) are usage errors, not runtime.
+                        if e.contains("must be") || e.contains("SQL-only") {
+                            usage(&e);
+                        }
+                        fail(e, docker_hint())
+                    });
+                if as_json {
+                    print_json(&serde_json::json!({ "ok": true }));
+                } else {
+                    println!("created");
+                }
+            }
+            DbCmd::Drop { id, name } => {
+                portside::schemas::drop_database(id, name)
+                    .await
+                    .unwrap_or_else(|e| {
+                        if e.contains("must be") || e.contains("SQL-only") {
+                            usage(&e);
+                        }
+                        fail(e, docker_hint())
+                    });
+                if as_json {
+                    print_json(&serde_json::json!({ "ok": true }));
+                } else {
+                    println!("dropped");
+                }
+            }
         },
-        Cmd::Start { .. } | Cmd::Stop { .. } | Cmd::Rm { .. } | Cmd::Create { .. } => {
-            usage("lifecycle commands land in Task 4")
+        Cmd::Start { id } => {
+            portside::docker::start_instance(id)
+                .await
+                .unwrap_or_else(|e| fail(e, docker_hint()));
+            if as_json {
+                print_json(&serde_json::json!({ "ok": true }));
+            } else {
+                println!("started");
+            }
+        }
+        Cmd::Stop { id } => {
+            portside::docker::stop_instance(id)
+                .await
+                .unwrap_or_else(|e| fail(e, docker_hint()));
+            if as_json {
+                print_json(&serde_json::json!({ "ok": true }));
+            } else {
+                println!("stopped");
+            }
+        }
+        Cmd::Rm { id, wipe } => {
+            portside::docker::remove_instance(id, wipe)
+                .await
+                .unwrap_or_else(|e| fail(e, docker_hint()));
+            if as_json {
+                print_json(&serde_json::json!({ "ok": true, "wipe": wipe }));
+            } else if wipe {
+                println!("removed and wiped");
+            } else {
+                println!("removed (volume kept)");
+            }
+        }
+        Cmd::Create {
+            engine,
+            tag,
+            port,
+            lan,
+            password,
+            wait,
+        } => {
+            let (tag, port) = resolve_create(&engine, &tag, port).unwrap_or_else(|e| {
+                if e.starts_with("unknown engine") || e == "no free ports" {
+                    usage(&e);
+                }
+                fail(e, docker_hint())
+            });
+            let bind_ip = if lan { "0.0.0.0" } else { "127.0.0.1" };
+            let inst = portside::docker::create_instance(
+                engine,
+                tag,
+                port,
+                Some(bind_ip.to_string()),
+                Some(password),
+            )
+            .await
+            .unwrap_or_else(|e| fail(e, docker_hint()));
+            if wait > 0 {
+                if let Err(e) = portside::health::wait_healthy(&inst.id, wait).await {
+                    fail(e, "instance created but unhealthy — check `portside-cli logs <id>`");
+                }
+            }
+            let fresh = portside::state::load_instance(&inst.id).unwrap_or(inst);
+            let lan_ip = if lan { portside::certs::lan_ip() } else { None };
+            let info = portside::connect::for_instance(&fresh, lan_ip.as_deref(), false);
+            if as_json {
+                print_json(&serde_json::json!({
+                    "id": fresh.id, "engine": fresh.engine, "tag": fresh.tag,
+                    "port": fresh.port, "status": fresh.status,
+                    "localhost_url": info.localhost_url, "lan_url": info.lan_url,
+                    "tls": info.tls,
+                }));
+            } else {
+                println!(
+                    "created {} ({}:{} {})",
+                    fresh.id, fresh.engine, fresh.port, fresh.status
+                );
+                println!("{}", info.localhost_url);
+                if let Some(url) = info.lan_url {
+                    println!("{url}");
+                }
+            }
         }
         Cmd::Mcp => usage("mcp server lands in Task 5"),
+    }
+}
+
+/// Resolve create defaults without touching Docker: empty tag becomes the
+/// catalog's first tag for the engine; port 0 becomes the suggested free
+/// port given already-saved instances.
+pub fn resolve_create(engine: &str, tag: &str, port: u16) -> Result<(String, u16), String> {
+    let tag = if tag.is_empty() {
+        portside::catalog::bundled_catalog()
+            .entries
+            .iter()
+            .find(|e| e.engine == engine)
+            .map(|e| e.tag.clone())
+            .ok_or_else(|| format!("unknown engine {engine}"))?
+    } else {
+        tag.to_string()
+    };
+    let port = if port == 0 {
+        let taken: Vec<u16> = portside::state::list_saved_instances()
+            .map(|v| v.iter().map(|i| i.port).collect())
+            .unwrap_or_default();
+        portside::catalog::suggest_port(engine.to_string(), taken)?
+    } else {
+        port
+    };
+    Ok((tag, port))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn resolve_defaults_tag_and_port() {
+        let (tag, port) = resolve_create("postgres", "", 0).expect("resolves");
+        assert_eq!(tag, "16"); // first postgres entry in src/catalog.json
+        assert_eq!(port, 5432); // base port when nothing is taken
+    }
+    #[test]
+    fn resolve_rejects_unknown_engine() {
+        assert!(resolve_create("oracle", "", 0).is_err());
+    }
+    #[test]
+    fn resolve_keeps_explicit_values() {
+        let (tag, port) = resolve_create("redis", "8", 56380).unwrap();
+        assert_eq!((tag.as_str(), port), ("8", 56380));
     }
 }
