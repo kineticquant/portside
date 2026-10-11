@@ -58,6 +58,34 @@ starts Docker, launches the app). Details in `TOOLCHAIN.md`.
 Instance metadata lives in SQLite (`%LOCALAPPDATA%\portside\portside.db`);
 actual data lives in Docker volumes (`portside-{id}-data`).
 
+## Agents (CLI + MCP)
+
+Headless control for agents and scripts — same instances, same Docker,
+same SQLite as the desktop app.
+
+```bash
+cargo build --release --manifest-path src-tauri/Cargo.toml --bin portside-cli
+./src-tauri/target/release/portside-cli create --engine postgres --tag 17 --wait 60 --json
+./src-tauri/target/release/portside-cli conn <id> --json
+./src-tauri/target/release/portside-cli db create <id> demo --json
+./src-tauri/target/release/portside-cli rm <id> --wipe
+```
+
+opencode (`opencode.json`):
+
+```json
+{ "mcp": { "portside": { "type": "local", "command": ["C:/path/to/portside-cli.exe", "mcp"] } } }
+```
+
+Claude Code (`.mcp.json` in your project):
+
+```json
+{ "mcpServers": { "portside": { "command": "C:/path/to/portside-cli.exe", "args": ["mcp"] } } }
+```
+
+Prompt your agent: "use portside to stand up postgres 17 with a
+database called demo and give me the connect string."
+
 ## Tests
 
 ```bash

@@ -56,3 +56,20 @@ jobs:
           releaseName: "Portside ${{ github.ref_name }}"
           releaseDraft: true
           args: ${{ matrix.args }}
+
+      - name: build portside-cli
+        run: cargo build --release --manifest-path src-tauri/Cargo.toml --bin portside-cli ${{ matrix.args }}
+
+      - name: upload portside-cli to draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then BIN=src-tauri/target/release/portside-cli.exe; OUT=portside-cli-windows-amd64.exe;
+          elif [ "${{ runner.os }}" = "macOS" ]; then BIN=src-tauri/target/release/portside-cli;
+            case "${{ matrix.args }}" in *aarch64*) ARCH=arm64;; *) ARCH=amd64;; esac; OUT=portside-cli-macos-$ARCH;
+          else BIN=src-tauri/target/release/portside-cli; OUT=portside-cli-linux-amd64; fi
+          # mac target dirs differ per --target; fall back to a find:
+          [ -f "$BIN" ] || BIN=$(find src-tauri/target -name 'portside-cli*' -type f -path '*release*' | head -n 1)
+          cp "$BIN" "./$OUT"
+          gh release upload "${{ github.ref_name }}" "./$OUT" --clobber
