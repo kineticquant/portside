@@ -126,6 +126,28 @@ pub async fn health(id: String) -> Result<Health, String> {
     Ok(h)
 }
 
+/// Poll `health(id)` once per second until healthy or timeout.
+/// Returns the last Health on timeout as an Err with a one-line summary.
+pub async fn wait_healthy(id: &str, timeout_secs: u64) -> Result<Health, String> {
+    let mut last = health(id.to_string()).await?;
+    for _ in 0..timeout_secs.max(1) {
+        if last.is_healthy() {
+            return Ok(last);
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        last = health(id.to_string()).await?;
+    }
+    if last.is_healthy() {
+        Ok(last)
+    } else {
+        Err(format!(
+            "instance {id} not healthy after {timeout_secs}s \
+             (container_running={} tcp_open={} query_ok={})",
+            last.container_running, last.tcp_open, last.query_ok
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

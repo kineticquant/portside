@@ -2,6 +2,7 @@
 //! Tauri `#[command]` functions are plain async fns — directly reusable.
 pub mod catalog;
 pub mod certs;
+pub mod connect;
 pub mod docker;
 #[cfg(test)]
 mod e2e;
