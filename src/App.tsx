@@ -6,6 +6,7 @@ import LogsPanel from "./components/LogsPanel";
 import PrereqPanel from "./components/PrereqPanel";
 import SchemaPanel from "./components/SchemaPanel";
 import { api, type CatalogEntry, type Health, type Instance, type Prereqs } from "./lib/tauri";
+import AgentPanel from "./components/AgentPanel";
 
 const ENGINES = ["mysql", "mariadb", "postgres", "redis", "valkey"];
 
@@ -303,6 +304,7 @@ export default function App() {
           strict={strict}
         />
       </section>
+      <AgentPanel />
       <div className="ps-inspector">
         <section className="ps-card">
           <SchemaPanel instanceId={selected?.id ?? null} engine={selected?.engine} />

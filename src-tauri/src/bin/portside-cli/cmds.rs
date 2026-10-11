@@ -3,6 +3,7 @@
 
 use crate::output::{docker_hint, fail, print_json, usage};
 use clap::{Parser, Subcommand};
+use portside::agents::Host;
 
 #[derive(Parser)]
 #[command(
@@ -76,6 +77,20 @@ pub enum Cmd {
     },
     /// MCP server over stdio (for agents)
     Mcp,
+    /// Register this binary's MCP server with a coding-agent harness
+    SetupAgent {
+        /// Harness to configure: opencode, claude, codex, cursor, windsurf, pi, omp, generic
+        #[arg(long, value_enum)]
+        host: Host,
+        /// Project directory for project-scoped config (default: user-global)
+        #[arg(long)]
+        project_dir: Option<std::path::PathBuf>,
+    },
+    /// Add (or --remove) this binary's directory to the user PATH
+    SetupPath {
+        #[arg(long)]
+        remove: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -293,6 +308,31 @@ pub async fn run(cmd: Cmd, as_json: bool) {
             }
         }
         Cmd::Mcp => unreachable!("the mcp server is dispatched in main"),
+        Cmd::SetupAgent { host, project_dir } => {
+            let r = portside::agents::setup_host(host, project_dir.as_deref())
+                .unwrap_or_else(|e| fail(e, "check the config path and permissions"));
+            if as_json {
+                print_json(&r);
+            } else {
+                println!("{}", r.note);
+                if let Some(p) = &r.path_written {
+                    println!("{p}");
+                }
+            }
+        }
+        Cmd::SetupPath { remove } => {
+            let note = if remove {
+                portside::agents::remove_from_path()
+            } else {
+                portside::agents::add_to_path()
+            }
+            .unwrap_or_else(|e| fail(e, "could not update PATH"));
+            if as_json {
+                print_json(&serde_json::json!({ "ok": true, "note": note }));
+            } else {
+                println!("{note}");
+            }
+        }
     }
 }
 

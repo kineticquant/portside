@@ -18,6 +18,7 @@ let runtimeCalls = 0;
 // Daemon comes up on the 3rd check: down, down, then up.
 vi.mock("./lib/tauri", () => ({
   DOCKER_DOWNLOAD_URL: "https://www.docker.com/products/docker-desktop/",
+  AGENT_HOSTS: ["opencode", "claude", "codex", "cursor", "windsurf", "pi", "omp"],
   api: {
     detectRuntime: () => {
       runtimeCalls += 1;
@@ -44,6 +45,9 @@ vi.mock("./lib/tauri", () => ({
         query_ok: false,
       }),
     connectString: () => "",
+    pathStatus: () => Promise.resolve({ on_path: false, cli_path: "", dir: "" }),
+    setupAgent: () => Promise.resolve({}),
+    setupPath: () => Promise.resolve(""),
   },
 }));
 

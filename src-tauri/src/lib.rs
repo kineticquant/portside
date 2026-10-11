@@ -1,5 +1,6 @@
 //! Shared core: the desktop app, the CLI, and the MCP server all call this.
 //! Tauri `#[command]` functions are plain async fns — directly reusable.
+pub mod agents;
 pub mod catalog;
 pub mod certs;
 pub mod connect;

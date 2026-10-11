@@ -2997,6 +2997,7 @@ dependencies = [
  "tauri-build",
  "tokio",
  "uuid",
+ "winreg",
 ]
 
 [[package]]

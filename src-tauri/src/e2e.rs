@@ -1,7 +1,8 @@
 //! Live Docker E2E (LAN postgres + LAN redis through the real commands).
 //!
 //! Ignored by default: needs a running Docker daemon and pulls real images.
-//! Run: `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored e2e`
+//! Run serially — parallel image pulls flake on Docker Desktop's pipe:
+//! `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored e2e --test-threads=1`
 //! Uses high test-only ports and always wipes its instances, even on failure.
 
 #![cfg(test)]

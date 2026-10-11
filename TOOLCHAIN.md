@@ -121,8 +121,17 @@ Notes:
 npm install          # frontend deps
 npm run build        # verify frontend builds to dist/
 cargo test --manifest-path src-tauri/Cargo.toml   # Rust tests
+cargo build --manifest-path src-tauri/Cargo.toml --bin portside-cli  # agent CLI
+./src-tauri/target/debug/portside-cli catalog --json  # CLI smoke test
 npx vitest run       # frontend tests
 npm run tauri dev    # run the desktop app
+```
+
+Live-Docker tests are serial by design (parallel image pulls flake on
+Docker Desktop's pipe):
+
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml -- --ignored e2e --test-threads=1
 ```
 
 Release builds for all three OSes are produced by the GitHub workflow

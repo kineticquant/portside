@@ -88,6 +88,30 @@ export type Prereqs = {
 export const DOCKER_DOWNLOAD_URL =
   "https://www.docker.com/products/docker-desktop/";
 
+export type PathStatus = {
+  on_path: boolean;
+  cli_path: string;
+  dir: string;
+};
+
+export type SetupResult = {
+  host: string;
+  scope: string;
+  path_written: string | null;
+  command_used: string;
+  note: string;
+};
+
+export const AGENT_HOSTS = [
+  "opencode",
+  "claude",
+  "codex",
+  "cursor",
+  "windsurf",
+  "pi",
+  "omp",
+] as const;
+
 export type ConnectOpts = {
   /** Host to advertise. Defaults to loopback; pass the LAN IP for laptops. */
   host?: string;
@@ -194,5 +218,9 @@ export const api = {
   prereqs: () => invoke<Prereqs>("check_prereqs"),
   installWsl: () => invoke<string>("install_wsl"),
   startDocker: () => invoke<string>("start_docker"),
+  setupAgent: (host: string) =>
+    invoke<SetupResult>("setup_agent", { host, global: true }),
+  setupPath: (remove: boolean) => invoke<string>("setup_path", { remove }),
+  pathStatus: () => invoke<PathStatus>("path_status"),
   connectString,
 };
